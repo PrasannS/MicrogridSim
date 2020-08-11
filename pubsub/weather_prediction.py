@@ -16,7 +16,7 @@ def on_weather_advance(client, userdata, message):
     weather_predictions = weatherdata.iloc[math.floor(timestep/60):math.floor(timestep/60)+weather_pred_depth]
     data['weather_predictions'] = weather_predictions
     data['timestep'] = timestep
-    client.publish(topic="climate-predictions", payload=data, qos=1, retain=False)
+    client.publish(topic="climate_predictions", payload=data, qos=1, retain=False)
 
 client.subscribe("climate", qos=1)
 client.message_callback_add("climate", on_weather_advance)

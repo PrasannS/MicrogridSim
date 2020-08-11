@@ -9,12 +9,17 @@ wind = pd.read_csv('../data/wind/wind_data.csv')
 
 wind_num = 0
 pv_num = 0
+pv_pred_depth = 200
+wind_pred_depth = 400
 
 def on_renewables_advance(client, userdata, message):
     global pv
     global wind
     global wind_num
     global pv_num
+    global pv_pred_depth
+    global wind_pred_depth
+
 
     timestep = message.payload.decode()['timestep']
     print("Timer Advanced: "+timestep)

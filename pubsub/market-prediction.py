@@ -20,10 +20,10 @@ for i in range(2, 20):
     df = pd.DataFrame()
     if(i>9):
         df = df.append(
-            pd.read_csv('./data/energy_price/PUB_PriceHOEPPredispOR_20'+str(i)+'.csv', skiprows=3))
+            pd.read_csv('../data/energy_price/PUB_PriceHOEPPredispOR_20'+str(i)+'.csv', skiprows=3))
     else: 
         df = df.append(
-            pd.read_csv('./data/energy_price/PUB_PriceHOEPPredispOR_200'+str(i)+'.csv', skiprows=3))
+            pd.read_csv('../data/energy_price/PUB_PriceHOEPPredispOR_200'+str(i)+'.csv', skiprows=3))
     df = clean_market_data(df)
 
 market = df
