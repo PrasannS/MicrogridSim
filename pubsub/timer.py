@@ -23,7 +23,7 @@ def on_received(client, userdata, messages):
 
 
 client.subscribe("battery", qos=1)
-client.subscribe("controller", qos=1)
+client.subscribe("controls", qos=1)
 client.subscribe("climate_prediction", qos=1)
 client.subscribe("renewables_prediction", qos=1)
 client.subscribe("market_prediction", qos=1)

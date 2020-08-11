@@ -1,4 +1,20 @@
 
+from __future__ import division
+import paho.mqtt.client as mqtt
+import pandas as pd
+import numpy as np
+from pylab import rcParams
+import simpy
+import random
+import statistics
+import pandas as pd
+import numpy as np
+import json
+import matplotlib.pyplot as plt
+import pickle
+import math
+
+
 num_houses = 4
 
 
@@ -21,6 +37,8 @@ wind = 0
 pv_prediction = []
 wind_prediction = []
 
+loads = []
+
 num_received = 0
 
 controls =  []
@@ -31,15 +49,28 @@ controls =  []
 #process the data and send the necessary controls
 def get_controls():
     global timestep
+    #This code is temporary
+    load_controls = []
+    tmp = {}
+    defaults = [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,]
+    for i in range(0, num_houses):
+        tmp['id'] = i
+        tmp['controls'] = defaults
+        load_controls.append(tmp)
+    controls = {}
+    controls['timestep'] = timestep
+
+    return controls, load_controls
 
 def run_num_received():
     global num_received
     global client
-    global controlss
     num+=1
     if num==7:
-        get_controls()
+        controls, load_controls = get_controls()
         client.publish(topic="controls", payload=controls, qos=1, retain=False)
+        for i in range(0, num_houses):
+            client.publish(topic="control-"+i, payload=load_controls[i], qos=1, retain=False)
         num = 0
 
 def on_renewable_prediction(client, userdata, messages):
@@ -49,7 +80,6 @@ def on_renewable_prediction(client, userdata, messages):
     pv_prediction = message.payload.decode()['pv_predictions']
     wind_prediction = message.payload.decode()['pv_predictions']
     run_num_received()
-
 
 def on_renewable(client, userdata, messages):
     global pv
@@ -66,13 +96,11 @@ def on_climate(client, userdata, messages):
     climate = message.payload.decode()['weather_params']
     run_num_received()
 
-
 def on_market(client, userdata, messages):
     global energy_price
     
     energy_price = message.payload.decode()['energy_price']
     run_num_received()
-
 
 def on_climate_prediction(client, userdata, messages):
     global climate_prediction
@@ -87,7 +115,6 @@ def on_market_prediction(client, userdata, messages):
     
     market_prediction = message.payload.decode()['market_predictions']
     run_num_received()
-
 
 def on_battery(client, userdata, messages):
     global battery_states
@@ -105,6 +132,10 @@ client.subscribe("renewables", qos=1)
 client.subscribe("renewables_prediction", qos=1)
 client.subscribe("market", qos=1)
 client.subscribe("market_prediction", qos=1)
+
+for i in range(0, num_houses):
+    client.subscribe("load-"+i, qos=1)
+    
 client.message_callback_add("battery", on_battery)
 client.message_callback_add("climate", on_climate)
 client.message_callback_add("market", on_market)

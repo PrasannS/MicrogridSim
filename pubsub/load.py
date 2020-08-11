@@ -36,14 +36,6 @@ def get_rands_from_data(inputdata, num):
     value_bins = np.searchsorted(cdf, values)
     random_from_cdf = bin_midpoints[value_bins]
 
-    '''
-    
-    plt.subplot(121)
-    plt.hist(data, 50)
-    plt.subplot(122)
-    plt.hist(random_from_cdf, 50)
-    plt.show()
-    '''
     return random_from_cdf
 
 #TODO add some sophistication so that it's time-based
@@ -210,6 +202,7 @@ def on_time_advance(client, userdata, message):
         tmp = h.get_state()
         tmp['total'] = h.run_load()
         tmp['timestamp'] = timestep
+        tmp['id'] = i
         i+=1
         client.publish(topic="load-"+str(i), payload=data, qos=1, retain=False)
 
@@ -217,9 +210,16 @@ def on_time_advance(client, userdata, message):
     data['finished'] = True
     client.publish(topic="loads", payload=data, qos=1, retain=False)
 
+def on_control_received(client, userdata, message):
+    global houses
+    load_id = message.payload.decode()['id']
+    houses[i] = message.payload.decode()['control']
 
 
 client.subscribe("timestep", qos=1)
+
+for i in range(0, num_houses):
+    client.subscribe("control-"+i, on_control_received)
 client.message_callback_add("timestep", on_timer_advance)
 
 client.loop_forever()
