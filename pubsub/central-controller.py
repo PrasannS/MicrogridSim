@@ -1,0 +1,1 @@
+num_houses = 4

@@ -209,9 +209,6 @@ class House(object):
             self.controls.append(not infs[i]['is_controllable'])
 
 
-    
-
-
 # %%
 total_load =  0
 timestep = 0
