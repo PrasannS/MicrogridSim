@@ -2,6 +2,8 @@ import paho.mqtt.client as mqtt
 import pandas as pd
 import numpy as np
 import math
+
+from numpyencoder import NumpyEncoder
 import json
 
 broker_url = "localhost"
@@ -22,10 +24,12 @@ def on_timer_advance(client, userdata, message):
     data = {}
     timestep = int(message.payload.decode())
     print("Timer Advanced: "+str(timestep))
-    weather_params = climate.iloc[math.floor(timestep/60)][0]
+    weather_params = climate.iloc[math.floor(timestep/60)].tolist()
+    print('WEATHER PARAMS')
+    print(weather_params)
     data['weather_params'] = weather_params
     data['timestep'] = timestep
-    client.publish(topic="climate", payload=json.dumps(data), qos=1, retain=False)
+    client.publish(topic="climate", payload=json.dumps(data, cls=NumpyEncoder), qos=1, retain=False)
 
 client.subscribe("timestep", qos=1)
 client.message_callback_add("timestep", on_timer_advance)

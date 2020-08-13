@@ -8,5 +8,4 @@ python renewable-prediction.py &
 python market.py &
 python market-prediction.py &
 python weather_prediction.py &
-python timer.py
 jobs

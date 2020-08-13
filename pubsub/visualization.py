@@ -17,11 +17,11 @@ import redis
 received = 0
 timestep = 0
 
-energy_price = 0
-climate = pd.DataFrame()
+energy_price = [0]
+climate = []
 climate_prediction = []
 market_prediction = []
-battery_state = pd.DataFrame()
+battery_state = []
 pv = [0]
 wind = [0]
 pv_prediction = []
@@ -80,17 +80,23 @@ def on_climate(client, userdata, message):
     newdata = json.loads(message.payload.decode())
 
     global climate
-    
-    climate = newdata['weather_params']
+    global pipe
+
+    climate.append(newdata['weather_params'])
+
+    pipe.set("climate", json.dumps(climate))
     run_num_received()
+
 
 def on_market(client, userdata, message):
     print("market")
     newdata = json.loads(message.payload.decode())
 
     global energy_price
+    global pipe
     
-    energy_price = newdata['energy_price']
+    energy_price.append(newdata['energy_price'])
+    pipe.set("market", json.dumps(energy_price))
     run_num_received()
 
 def on_climate_prediction(client, userdata, message):
@@ -98,9 +104,11 @@ def on_climate_prediction(client, userdata, message):
     newdata = json.loads(message.payload.decode())
 
     global climate_prediction
+    global pipe
 
     
     climate_prediction = newdata['weather_predictions']
+    pipe.set("climate_prediction", json.dumps(climate_prediction))
     run_num_received()
 
 def on_market_prediction(client, userdata, message):
@@ -109,9 +117,11 @@ def on_market_prediction(client, userdata, message):
     newdata = json.loads(message.payload.decode())
 
     global market_prediction
+    global pipe
 
     
     market_prediction = newdata['market_predictions']
+    pipe.set("market_prediction", json.dumps(market_prediction))
     run_num_received()
 
 def on_battery(client, userdata, message):
@@ -119,10 +129,12 @@ def on_battery(client, userdata, message):
     print("battery")
     newdata = json.loads(message.payload.decode())
 
-    global battery_states
+    
+    global battery_state
 
     
-    battery_state = message.payload.decode()
+    battery_state.append(newdata)
+    pipe.set("battery", json.dumps(battery_state))
     run_num_received()
 
 

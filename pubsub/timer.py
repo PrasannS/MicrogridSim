@@ -24,7 +24,7 @@ def on_received(client, userdata, message):
     #print("RECEIVED MESSAGE"+ str(json.loads(message.payload.decode())))
     print("RECEIVED "+str(received))
     if received==5:
-        time.sleep(1)
+        time.sleep(.1)
         received = 0
         client.publish(topic="timestep", payload=timestep, qos=1, retain=False)
         timestep+=1
