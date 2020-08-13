@@ -1,4 +1,11 @@
-broker_url = "mqtt.eclipse.org"
+import paho.mqtt.client as mqtt
+import pandas as pd
+import numpy as np
+import math
+import json
+
+
+broker_url = "localhost"
 broker_port = 1883
 
 client = mqtt.Client()
@@ -19,20 +26,25 @@ def on_renewables_advance(client, userdata, message):
     global pv_num
     global pv_pred_depth
     global wind_pred_depth
+    newdata = json.loads(message.payload.decode())
+
+    data = {}
 
 
-    timestep = message.payload.decode()['timestep']
-    print("Timer Advanced: "+timestep)
+    timestep = newdata['timestep']
+    print(timestep)
 
+
+    pv_predictions = pv['Power(MW)'].iloc[math.floor(timestep/5):math.floor(timestep/5)+pv_pred_depth] *1000
+    wind_predictions = wind['LV ActivePower (kW)'].iloc[math.floor(timestep/10):math.floor(timestep/10)+wind_pred_depth]
     
-    pv_predictions = pvdata['Power(MW)'].iloc[math.floor(timestep/5):math.floor(timestep/5)+pv_pred_depth] *1000
-    wind_predictions = winddata['LV ActivePower (kW)'].iloc[math.floor(timestep/10):math.floor(timestep/10)+wind_pred_depth]
-    
-    data['pv_predictions'] = pv_predictions*pv_num
-    data['wind_predictions'] = wind_predictions*wind_num
+    data['pv_output']= newdata['pv_output']
+    data['wind_output']= newdata['wind_output']
+    data['pv_predictions'] = (pv_predictions*pv_num).to_list()
+    data['wind_predictions'] = (wind_predictions*wind_num).to_list()
 
     data['timestep'] = timestep
-    client.publish(topic="renewables_prediction", payload=data, qos=1, retain=False)
+    client.publish(topic="renewables_prediction", payload=json.dumps(data), qos=1, retain=False)
 
 
 client.subscribe("renewables_ouput", qos=1)

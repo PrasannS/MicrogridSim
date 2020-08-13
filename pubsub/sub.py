@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 
-broker_url = "mqtt.eclipse.org"
+broker_url = "localhost"
 broker_port = 1883
 
 def on_connect(client, userdata, flags, rc):

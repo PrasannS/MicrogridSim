@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import pickle
 import math
 
-broker_url = "mqtt.eclipse.org"
+broker_url = "localhost"
 broker_port = 1883
 
 client = mqtt.Client()
@@ -21,7 +21,7 @@ client.connect(broker_url, broker_port)
 
 controllables = ['CDE', 'CWE', 'DWE', 'FGE', 'FRE', 'HPE', 'HTE']
 state_connected = ['FGE', 'FRE', 'HPE', 'HTE']
-load_data = pickle.load( open( "./data/ampds.p", "rb" ) )
+load_data = pickle.load( open( "../data/ampds.p", "rb" ) )
 
 def get_rands_from_data(inputdata, num):
 
@@ -84,7 +84,8 @@ class Meter(object):
     #power_thresh = 200
     
     def __init__(self, json_path):
-        params = json.load(open(json_path))
+        #params = json.load(open(json_path))
+        ""
 
 class House(object):
     
@@ -93,14 +94,14 @@ class House(object):
     meter = Meter('house_params.json')
     
     
-    def __init__(self, env, json_path):
-        self.env = env
+    def __init__(self, json_path):
         self.meter.meter = Meter(json_path)
 
     def get_state(self):
         data = {}
         data['controls'] = self.controls
         data['loads'] = self.meter.loads
+        return data
 
 
     def update_state(self):
@@ -181,21 +182,23 @@ infos = init_info(load_data, True)
 distrs = get_distrs_from_ds(load_data)
 
 for i in range(0, num_houses):
-        h = House(env, 'house_params.json')
+        h = House('house_params.json')
         h.set_load_distros(distrs)
         #h.meter.infos = infos
         h.set_infos(infos)
         houses.append(h)
 
     
-def on_time_advance(client, userdata, message):
+def on_timer_advance(client, userdata, message):
+    newdata = int(message.payload.decode())
+
     global timestep
     global houses
     data = {}
     tmp = {}
     
-    timestep = message.payload.decode()['timestep']
-    print("Timer Advanced: "+timestep)
+    timestep = newdata
+    print(str(timestep))
 
     i = 0
     for h in houses:
@@ -204,22 +207,25 @@ def on_time_advance(client, userdata, message):
         tmp['timestamp'] = timestep
         tmp['id'] = i
         i+=1
-        client.publish(topic="load-"+str(i), payload=data, qos=1, retain=False)
+        client.publish(topic="load-"+str(i), payload=json.dumps(data), qos=1, retain=False)
 
     data['timestep'] = timestep
     data['finished'] = True
-    client.publish(topic="loads", payload=data, qos=1, retain=False)
+    client.publish(topic="loads", payload=json.dumps(data), qos=1, retain=False)
 
 def on_control_received(client, userdata, message):
+    newdata = json.loads(message.payload.decode())
+
     global houses
-    load_id = message.payload.decode()['id']
-    houses[i] = message.payload.decode()['control']
+    load_id = newdata['id']
+    houses[i] = newdata['control']
 
 
 client.subscribe("timestep", qos=1)
 
 for i in range(0, num_houses):
-    client.subscribe("control-"+i, on_control_received)
+    client.subscribe("control-"+str(i), qos=1)
+    client.message_callback_add("control"+str(i), on_control_received)
 client.message_callback_add("timestep", on_timer_advance)
 
 client.loop_forever()

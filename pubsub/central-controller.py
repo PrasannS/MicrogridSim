@@ -4,7 +4,6 @@ import paho.mqtt.client as mqtt
 import pandas as pd
 import numpy as np
 from pylab import rcParams
-import simpy
 import random
 import statistics
 import pandas as pd
@@ -15,10 +14,11 @@ import pickle
 import math
 
 
+
 num_houses = 4
 
 
-broker_url = "mqtt.eclipse.org"
+broker_url = "localhost"
 broker_port = 1883
 
 client = mqtt.Client()
@@ -41,8 +41,6 @@ loads = []
 
 num_received = 0
 
-controls =  []
-
 #TODO global client added literally everywhere I think
 
 #Given that all of the data for the iteration has been received,
@@ -58,6 +56,7 @@ def get_controls():
         tmp['controls'] = defaults
         load_controls.append(tmp)
     controls = {}
+    controls['battery'] = 0
     controls['timestep'] = timestep
 
     return controls, load_controls
@@ -65,58 +64,75 @@ def get_controls():
 def run_num_received():
     global num_received
     global client
-    num+=1
-    if num==7:
+    print(num_received)
+    num_received+=1
+    if num_received==6:
         controls, load_controls = get_controls()
-        client.publish(topic="controls", payload=controls, qos=1, retain=False)
+        client.publish(topic="controls", payload=json.dumps(controls), qos=1, retain=False)
         for i in range(0, num_houses):
-            client.publish(topic="control-"+i, payload=load_controls[i], qos=1, retain=False)
-        num = 0
+            client.publish(topic="control-"+str(i), payload=json.dumps(load_controls[i]), qos=1, retain=False)
+        num_received = 0
 
-def on_renewable_prediction(client, userdata, messages):
+def on_renewable_prediction(client, userdata, message):
+    print("ren_predict")
+    newdata = json.loads(message.payload.decode())
+
     global pv_prediction
     global wind_prediction
-    
-    pv_prediction = message.payload.decode()['pv_predictions']
-    wind_prediction = message.payload.decode()['pv_predictions']
-    run_num_received()
-
-def on_renewable(client, userdata, messages):
     global pv
     global wind
-    global timestep
-    timesteps = message.payload.decode()['timestep']
-    pv = message.payload.decode()['pv_output']
-    wind = message.payload.decode()['wind_output']
+    
+    pv = newdata['pv_output']
+    wind = newdata['wind_output']
+    pv_prediction = newdata['pv_predictions']
+    wind_prediction = newdata['pv_predictions']
     run_num_received()
 
-def on_climate(client, userdata, messages):
+def on_climate(client, userdata, message):
+    print("climate")
+    print(message.payload.decode())
+    newdata = json.loads(message.payload.decode())
+
     global climate
     
-    climate = message.payload.decode()['weather_params']
+    climate = newdata['weather_params']
     run_num_received()
 
-def on_market(client, userdata, messages):
+def on_market(client, userdata, message):
+    print("market")
+    newdata = json.loads(message.payload.decode())
+
     global energy_price
     
-    energy_price = message.payload.decode()['energy_price']
+    energy_price = newdata['energy_price']
     run_num_received()
 
-def on_climate_prediction(client, userdata, messages):
+def on_climate_prediction(client, userdata, message):
+    print("clim_predict")
+    newdata = json.loads(message.payload.decode())
+
     global climate_prediction
 
     
-    climate_prediction = message.payload.decode()['climate_predictions']
+    climate_prediction = newdata['weather_predictions']
     run_num_received()
 
-def on_market_prediction(client, userdata, messages):
+def on_market_prediction(client, userdata, message):
+
+    print("market_predict")
+    newdata = json.loads(message.payload.decode())
+
     global market_prediction
 
     
-    market_prediction = message.payload.decode()['market_predictions']
+    market_prediction = newdata['market_predictions']
     run_num_received()
 
-def on_battery(client, userdata, messages):
+def on_battery(client, userdata, message):
+
+    print("battery")
+    newdata = json.loads(message.payload.decode())
+
     global battery_states
 
     
@@ -126,22 +142,30 @@ def on_battery(client, userdata, messages):
 
 
 client.subscribe("battery", qos=1)
-client.subscribe("climate", qos=1)
-client.subscribe("climate_prediction", qos=1)
-client.subscribe("renewables", qos=1)
+client.message_callback_add("battery", on_battery)
+
+client.subscribe("climate_predictions", qos=1)
+client.message_callback_add("climate_predictions", on_climate_prediction)
+
+
+
 client.subscribe("renewables_prediction", qos=1)
+client.message_callback_add("renewables_prediction", on_renewable_prediction)
+
+
 client.subscribe("market", qos=1)
-client.subscribe("market_prediction", qos=1)
+client.message_callback_add("market", on_market)
+
+
+client.subscribe("market_predictions", qos=1)
+client.message_callback_add("market_predictions", on_market_prediction)
+
 
 for i in range(0, num_houses):
-    client.subscribe("load-"+i, qos=1)
+    client.subscribe("load-"+str(i), qos=1)
     
-client.message_callback_add("battery", on_battery)
+client.subscribe("climate", qos=1)
 client.message_callback_add("climate", on_climate)
-client.message_callback_add("market", on_market)
-client.message_callback_add("renewables", on_renewable)
-client.message_callback_add("climate_prediction", on_climates)
-client.message_callback_add("renewables_prediction", on_renewable_prediction)
-client.message_callback_add("market_prediction", on_market_prediction)
+
 
 client.loop_forever()

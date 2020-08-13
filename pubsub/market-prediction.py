@@ -1,8 +1,10 @@
 import paho.mqtt.client as mqtt
 import pandas as pd
 import numpy as np
+import math
+import json
 
-broker_url = "mqtt.eclipse.org"
+broker_url = "localhost"
 broker_port = 1883
 
 client = mqtt.Client()
@@ -12,7 +14,7 @@ def clean_market_data(df):
     try:
         df['HOEP'] = pd.to_numeric(df['HOEP'].str.replace(',', ''))
     except:
-        #print("Already Number")
+        print("Already Number")
         ""
     return df
 
@@ -28,23 +30,29 @@ for i in range(2, 20):
 
 market = df
 
+market_pred_depth = 1000
+
 def on_market_advance(client, userdata, message):
+    newdata = json.loads(message.payload.decode())
+
     global market
-    timestep = message.payload.decode()['timestep']
-    print("Timer Advanced: "+timestep)
+    global market_pred_depth
+    data = {}
+    timestep = newdata['timestep']
+    print(str(timestep))
 
-    market_predictions = market['HOEP'].iloc[math.floor(timestep/60):math.floor(timestep/60)+market_pred_depth]
+    market_predictions = market.iloc[math.floor(timestep/60):math.floor(timestep/60)+market_pred_depth]['HOEP']
 
-    data['market_predictions'] = market_predictions
+    data['market_predictions'] = market_predictions.to_list()
 
     data['timestep'] = timestep
-    client.publish(topic="market_predictions", payload=data, qos=1, retain=False)
+    client.publish(topic="market_predictions", payload=json.dumps(data), qos=1, retain=False)
 
 
 
 #weather_predictions = weatherdata.iloc[math.floor(timestep/60):math.floor(timestep/60)+weather_pred_depth]
 
 client.subscribe("market", qos=1)
-client.message_callback_add("market", on_timer_advance)
+client.message_callback_add("market", on_market_advance)
 
 client.loop_forever()
