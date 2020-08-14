@@ -3,9 +3,10 @@ python battery.py &
 python central-controller.py &
 python climate.py &
 python load.py &
-python renewable.py &
 python renewable-prediction.py &
 python market.py &
 python market-prediction.py &
 python weather_prediction.py &
+python visualization.py &
+python renewable.py &
 jobs

@@ -68,6 +68,11 @@ def on_renewable_prediction(client, userdata, message):
     wind_prediction = newdata['pv_predictions']
     run_num_received()
 
+    print("PV OUTPUT")
+    print(newdata['pv_output'])
+    print("WIND OUTPUT")
+    print(newdata['wind_output'])
+
     pipe.set('pv_predicted', json.dumps(pv_prediction))
     pipe.set('wind_predicted', json.dumps(pv_prediction))
     pipe.set('pv', json.dumps(pv))
@@ -129,13 +134,22 @@ def on_battery(client, userdata, message):
     print("battery")
     newdata = json.loads(message.payload.decode())
 
-    
     global battery_state
-
+    global pipe
     
     battery_state.append(newdata)
     pipe.set("battery", json.dumps(battery_state))
     run_num_received()
+
+loads = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],]
+
+def on_load(client, userdata, messasge):
+    global loads
+    newdata = json.loads(message.payload.decode())
+
+    pipe.set("loads")
+    print("load"+str(newdata['id']))
+    
 
 
 
@@ -161,6 +175,7 @@ client.message_callback_add("market_predictions", on_market_prediction)
 
 for i in range(0, num_houses):
     client.subscribe("load-"+str(i), qos=1)
+
     
 client.subscribe("climate", qos=1)
 client.message_callback_add("climate", on_climate)
