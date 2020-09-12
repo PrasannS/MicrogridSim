@@ -18,7 +18,7 @@ wind_num = 0
 pv_num = 0
 pv_pred_depth = 200
 wind_pred_depth = 400
-
+# small modification
 def on_renewables_advance(client, userdata, message):
     global pv
     global wind
