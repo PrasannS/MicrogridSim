@@ -57,13 +57,18 @@ weather_cols = ['Date', 'Year', 'Month', 'Day', 'Time', 'Temperature', 'Dew Poin
                 'Rel Humidity', 'Wind Dir', 'Wind Spd', 'Visibility', 'Stn Press', 'Hmdx', 'Wind Chill',
                 'Weather']
 
-load_infos = ['B1E', 'B1E_INFO', 'B2E', 'B2E_INFO', 'BME', 'BME_INFO', 'CDE', 'CDE_INFO', 'CWE', 'CWE_INFO', 'DNE', 'DNE_INFO', 'DWE', 'DWE_INFO', 'EBE', 'EBE_INFO', 'EQE', 'EQE_INFO','FGE', 'FGE_INFO', 'FRE', 'FRE_INFO', 'GRE', 'GRE_INFO', 'HPE', 'HPE_INFO', 'HTE', 'HTE_INFO', 'OFE', 'OFE_INFO', 'OUE', 'OUE_INFO', 'RSE', 'RSE_INFO', 'TVE', 'TVE_INFO', 'UTE', 'UTE_INFO']
+load_infos = ['B1E', 'B2E', 'BME','CDE',  'CWE', 'DNE', 'DWE', 'EBE', 'EQE','FGE', 'FRE', 'GRE',  'HPE',  'HTE', 'OFE',  'OUE', 'RSE',  'TVE', 'UTE']
 
 
 def init_tables():
     global cur
+    global conn
+
+    global load_infos
 
     creates = []
+
+    creates.append("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")
 
     creates.append("""CREATE TABLE weather (
                                         date TEXT,
@@ -77,61 +82,55 @@ def init_tables():
                                         hmdx DOUBLE PRECISION,
                                         windchill DOUBLE PRECISION,
                                         temp DOUBLE PRECISION,
-                                        timestep INTEGER,
+                                        timestep INTEGER NOT NULL
                                     );""")
 
-    creates.append("SELECT create_hypertable('weather', 'timestep');")
+    creates.append("SELECT create_hypertable('weather', 'timestep',chunk_time_interval => 60000 );")
 
     creates.append("""CREATE TABLE market (
                                         price DOUBLE PRECISION, 
-                                        timestep INTEGER,
+                                        timestep INTEGER NOT NULL
                                     );""")
 
-    creates.append("SELECT create_hypertable('market', 'timestep');")
+    creates.append("SELECT create_hypertable('market', 'timestep',chunk_time_interval => 60000);")
 
     creates.append("""CREATE TABLE renewable (
                                         wind DOUBLE PRECISION, 
-                                        solar DOUBLE PRECISION,s
-                                        timestep INTEGER,
+                                        solar DOUBLE PRECISION,
+                                        timestep INTEGER NOT NULL
                                     );""")
 
-    creates.append("SELECT create_hypertable('renewable', 'timestep');")
+    creates.append("SELECT create_hypertable('renewable', 'timestep',chunk_time_interval => 60000);")
 
     creates.append("""CREATE TABLE battery (
                                         charged DOUBLE PRECISION,
-                                        timestep INTEGER,
+                                        timestep INTEGER NOT NULL
                                     );""")
 
-    creates.append("SELECT create_hypertable('battery', 'timestep');")
+    creates.append("SELECT create_hypertable('battery', 'timestep',chunk_time_interval => 60000);")
 
     tmp = ""
-    for i in range(0, len(load_infos)):
-
-        if "INFO" not in load_infos[i]:
-            tmp+load_infos[i]+" TEXT,\n"
+    for i in range(0, num_houses):
+        for j in range(0, len(load_infos)):
+            creates.append("""CREATE TABLE load"""+str(i)+load_infos[j]+""" (
+                                            power DOUBLE PRECISION,
+                                            timestep INTEGER NOT NULL
+                                        );""")
+            creates.append("SELECT create_hypertable('load"+str(i)+load_infos[j]+"', 'timestep',chunk_time_interval => 60000);")
 
     for i in range(0, num_houses):
-        creates.append("""CREATE TABLE load-"""+str(num_houses)+""" (
-                                        timestep INTEGER NOT NULL,
-                                        """+tmp+"""
-                                    );""")
-        creates.append("SELECT create_hypertable('load-" +str(num_houses)+"', 'timestep');")
-
-    tmp = ""
-    for i in range(0, len(load_infos)):
-        if "INFO" not in load_infos[i]:
-            tmp += load_infos[i]+" INTEGER,\n"
-
-    for i in range(0, num_houses):
-        creates.append("""CREATE TABLE control-"""+str(num_houses)+""" (
-                                        timestep INTEGER NOT NULL,
-                                        """+tmp+"""
-                                    );""")
-        creates.append("SELECT create_hypertable('control-" +str(num_houses)+"', 'timestep');")
+        for j in range(0, len(load_infos)):
+            creates.append("""CREATE TABLE control"""+str(i)+load_infos[j]+""" (
+                                            control INTEGER,
+                                            timestep INTEGER NOT NULL
+                                        );""")
+            creates.append("SELECT create_hypertable('control" +str(i)+load_infos[j]+"', 'timestep',chunk_time_interval => 60000);")
 
     for c in creates:
+        print(c)
         cur.execute(c)
 
+    conn.commit()
 
 def run_num_received():
     global num_received
@@ -140,12 +139,12 @@ def run_num_received():
     print(num_received)
     num_received += 1
     if num_received == 6:
+        print("committing connection")
         conn.commit()
         num_received = 0
 
 
 def on_renewable_prediction(client, userdata, message):
-    print("ren_predict")
     newdata = json.loads(message.payload.decode())
 
     data = (newdata['wind_output'], newdata['pv_output'], newdata['timestep'])
@@ -157,29 +156,29 @@ def on_renewable_prediction(client, userdata, message):
     run_num_received()
 
 def on_climate(client, userdata, message):
-    print("climate")
-    print(message.payload.decode())
     newdata = json.loads(message.payload.decode())
 
-    climcols = ['date','weather','dewpoint','relhumidity','winddir','windspd','visibility','stnpress','hmdx','windchill','temp','timestep',]
+    climcols = ['date','weather','dewpoint','relhumidity','winddir','windspd','visibility','stnpress','hmdx','windchill','temp']
+    weather_cols = ['Date','Year','Month','Day','Time','Temperature','Dew Point Temp','Rel Humidity','Wind Dir','Wind Spd','Visibility','Stn Press','Hmdx','Wind Chill','Weather']
 
-    ren = "INSERT INTO climate (date,weather,dewpoint,relhumidity,winddir,windspd,visibility,stnpress,hmdx,windchill,temp,timestep,) VALUES (%s ,%s, %s,%s ,%s, %s,%s ,%s, %s,%s ,%s, %s,)"
+    ren = "INSERT INTO weather (date,temp,dewpoint,relhumidity,winddir,windspd,visibility,stnpress,hmdx,windchill,weather,timestep) VALUES (%s ,%s, %s,%s ,%s, %s,%s ,%s, %s,%s ,%s, %s)"
 
     tmp = []
-    for w in weather_cols:
-            tmp.append(newdata[w])
-    data = tuple(temp)
+    tmp.append(newdata['weather_params'][0])
+    for w in range(5, len(weather_cols)):
+            tmp.append(newdata['weather_params'][w])
+    tmp.append(int(newdata['timestep']))
+    data = tuple(tmp)
 
     cur.execute(ren, data)
     run_num_received()
 
 def on_market(client, userdata, message):
-    print("market")
     newdata = json.loads(message.payload.decode())
 
-    ren = "INSERT INTO market (market,timestep,) VALUES (%s ,%s)"
+    ren = "INSERT INTO market (price,timestep) VALUES (%s ,%s)"
 
-    data = (newdata['market'], newdata['timestep'])
+    data = (newdata['energy_price'], newdata['timestep'])
     
     global cur
     cur.execute(ren, data)
@@ -188,7 +187,6 @@ def on_market(client, userdata, message):
 
 
 def on_climate_prediction(client, userdata, message):
-    print("clim_predict")
     newdata = json.loads(message.payload.decode())
 
     global climate_prediction
@@ -217,7 +215,7 @@ def on_battery(client, userdata, message):
     print("battery")
     newdata = json.loads(message.payload.decode())
 
-    ren = "INSERT INTO battery (charged,timestep,) VALUES (%s ,%s)"
+    ren = "INSERT INTO battery (charged,timestep) VALUES (%s ,%s)"
 
     data = (newdata['charged'], newdata['timestep'])
     global cur
@@ -225,14 +223,19 @@ def on_battery(client, userdata, message):
 
     run_num_received()
 
-
-loads = [[], [], [], [], [], [], [], [], [], [], [], [], [], [],[], [], [], [], [], [], [], [], [], [], [], [], [], [], ]
-
-
-def on_load(client, userdata, messasge):
-    global loads
+def on_load(client, userdata, message):
+    global load_infos
+    global cur
     newdata = json.loads(message.payload.decode())
+    print(newdata)
+    print(json.loads(newdata['loads'])[0])
+    for i in range(0, len(load_infos)):
+        data = (json.loads(newdata['loads'])[i], newdata['timestep'])
+        add = "INSERT INTO load"+str(newdata['id'])+load_infos[i]+" (power, timestep) VALUES (%s, %s)"
+        cur.execute(add, data)
 
+
+init_tables()
 
 client.subscribe("battery", qos=1)
 client.message_callback_add("battery", on_battery)
@@ -255,6 +258,7 @@ client.message_callback_add("market_predictions", on_market_prediction)
 
 for i in range(0, num_houses):
     client.subscribe("load-"+str(i), qos=1)
+    client.message_callback_add("load-"+str(i), on_load)
 
 
 client.subscribe("climate", qos=1)

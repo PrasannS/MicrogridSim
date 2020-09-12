@@ -39,12 +39,12 @@ def get_rands_from_data(inputdata, num):
     return random_from_cdf
 
 #TODO add some sophistication so that it's time-based
-def get_distrs_from_ds(ds):
+def get_distrs_from_ds(time):
+    global load_distrs
     distrs = []
-    for key in ds.keys():
-        if "INFO" not in key:
-            distrs.append(ds[key]['apparent'])
-    #print(distrs)
+    for l in load_distrs:
+        distrs.append(l[time:time+60])
+    
     return distrs
 
 # - is_controllable
@@ -123,9 +123,6 @@ class House(object):
                 if len(self.meter.loads)==i:
                     self.meter.loads.append(0)
                 self.meter.loads[i]= tmp
-                #print(tmp)
-        #print(self.meter.load_distros)
-        #print(self.meter.loads)
 
 
     #critical loads can be treated as 1 in this scenario    
@@ -152,9 +149,6 @@ class House(object):
     def set_load_distros(self, distros):
         self.meter.load_distros = distros
 
-    def set_dur_distros(self, distros):
-        self.duration_distros = distros
-
     #performs all functions for a typical iteration
     def run_load(self):
         #print("Next")
@@ -177,9 +171,16 @@ total_load =  0
 timestep = 0
 num_houses = 4
 houses = []
+load_distrs = []
+
+for key in load_data.keys():
+    if "INFO" not in key:
+        load_distrs.append(load_data[key]['apparent'])
 
 infos = init_info(load_data, True)
-distrs = get_distrs_from_ds(load_data)
+distrs = get_distrs_from_ds(0)
+
+
 
 for i in range(0, num_houses):
         h = House('house_params.json')
@@ -201,16 +202,30 @@ def on_timer_advance(client, userdata, message):
     print(str(timestep))
 
     i = 0
+    reset_distrs = False
+    tmp_distrs = []
+    if timestep%60==0:
+        reset_distrs=True
+        tmp_distrs = get_distrs_from_ds(timestep)
+
     for h in houses:
         tmp = h.get_state()
+        print("LOAD - "+str(i))
         tmp['total'] = h.run_load()
-        tmp['timestamp'] = timestep
+        tmp['timestep'] = timestep
         tmp['id'] = i
+        tmp['total'] = str(tmp['total'])
+        tmp['loads'] = json.dumps(np.array(tmp['loads']).tolist())
+        if reset_distrs:
+            h.set_load_distros(tmp_distrs)
+
         i+=1
-        client.publish(topic="load-"+str(i), payload=json.dumps(data), qos=1, retain=False)
+        print(tmp)
+        client.publish(topic="load-"+str(i), payload=json.dumps(tmp), qos=1, retain=False)
 
     data['timestep'] = timestep
     data['finished'] = True
+    print(json.dumps(data))
     client.publish(topic="loads", payload=json.dumps(data), qos=1, retain=False)
 
 def on_control_received(client, userdata, message):
